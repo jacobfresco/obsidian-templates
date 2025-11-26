@@ -1,0 +1,89 @@
+<%*
+const TOP_LEVEL = [
+  "010 Privé",
+  "150 Aquarium",
+  "200 Genealogie",
+  "300 Kinderen",
+  "400 Tamnarco"
+];
+
+// Helpers
+const getFolder = (path) => app.vault.getAbstractFileByPath(path);
+const listSubfolders = (folder) =>
+  (folder && "children" in folder)
+    ? folder.children.filter(ch => ("children" in ch)).map(f => f.path)
+    : [];
+
+const STOP_HERE = "__STOP__";
+const CREATE_NEW = "__NEW__";
+
+// 1) Kies top-level map
+let current = await tp.system.suggester(
+  TOP_LEVEL.map(p => p.split("/").pop()),
+  TOP_LEVEL,
+  true
+);
+if (!current) { tR += "❌ Geen map gekozen."; return; }
+
+// 2) Loop: blijf kiezen zolang er submappen zijn (of gebruiker verder wil)
+while (true) {
+  const folder = getFolder(current);
+  if (!folder) { tR += `❌ Map niet gevonden: ${current}`; return; }
+
+  const subs = listSubfolders(folder);
+
+  // Geen submappen? Klaar.
+  if (subs.length === 0) break;
+
+  // Bouw keuzelijst
+  const labels = subs.map(p => p.replace(current + "/", ""));
+  const values = [...subs];
+
+  // Altijd deze extra opties
+  labels.unshift("✅ Gebruik huidige map (stop hier)");
+  values.unshift(STOP_HERE);
+
+  labels.push("➕ Nieuwe submap…");
+  values.push(CREATE_NEW);
+
+  const sel = await tp.system.suggester(labels, values, true);
+  if (!sel) { tR += "❌ Afgebroken."; return; }
+
+  if (sel === STOP_HERE) break;
+
+  if (sel === CREATE_NEW) {
+    const name = await tp.system.prompt(`Naam nieuwe submap in "${current}":`);
+    if (name && name.trim()) {
+      const newPath = `${current}/${name.trim()}`;
+      try { await app.vault.createFolder(newPath); } catch (e) {}
+      // Ga verder in de nieuw aangemaakte submap (meestal zonder verdere submappen)
+      current = newPath;
+      continue;
+    } else {
+      // Niks ingevoerd: opnieuw de loop (toon weer opties)
+      continue;
+    }
+  }
+
+  // Gebruiker koos een bestaande submap → ga dieper
+  current = sel;
+}
+
+
+const onderwerp = await tp.system.prompt("Onderwerp van deze notitie");
+const tags= await tp.system.prompt("Tags voor deze notitie", "#notitie")
+const datum = tp.date.now("DD-MM-YYYY");
+const tijd = tp.date.now("HH:mm");
+
+await tp.file.move(current + "/" + onderwerp)
+// Output als Markdown via return
+tR += `---
+title: ${onderwerp}
+tags: ${tags}
+created: ${datum}
+---
+&nbsp;
+
+**Tags:** ${tags}
+*Notitie aangemaakt op ${datum} om ${tijd}*`;
+%>
